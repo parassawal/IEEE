@@ -1,7 +1,7 @@
-pypdf
-reportlab
-pandas
-openpyxl
-streamlit
-pdf2image
-Pillow
+pypdf>=3.0.0
+reportlab>=4.0.0
+pandas>=2.0.0
+openpyxl>=3.1.0
+streamlit>=1.30.0
+pdf2image>=1.16.0
+Pillow>=10.0.0
