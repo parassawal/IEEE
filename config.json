@@ -1,0 +1,22 @@
+{
+    "template_path": "../_Certificate of Appreciation.pdf",
+    "output_dir": "./output",
+    "x_position": 421,
+    "y_position": 268,
+    "font_name": "Helvetica-Bold",
+    "font_size": 36,
+    "font_color": "#000000",
+    "alignment": "center",
+    "filename_template": "{name}_Certificate.pdf",
+    "custom_font_path": "",
+    "_comment_email": "Email Configuration - Fill these in to enable email sending",
+    "email": {
+        "smtp_server": "smtp.gmail.com",
+        "smtp_port": 587,
+        "sender_email": "mgmcet.ieee@gmail.com",
+        "sender_password": "",
+        "sender_name": "IEEE Student Branch MGMCET",
+        "email_subject": "Your IEEE Event Participation Certificate",
+        "email_template_file": "email_template.txt"
+    }
+}
