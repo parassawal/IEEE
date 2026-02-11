@@ -1,0 +1,22 @@
+{
+  "title": "IEEE Event Registration 2025",
+  "description": "ieee form",
+  "fields": [
+    {
+      "id": "name",
+      "type": "text",
+      "label": "Full Name",
+      "required": true,
+      "placeholder": "Enter your full name",
+      "description": "As it should appear on the certificate"
+    },
+    {
+      "id": "email",
+      "type": "email",
+      "label": "Email Address",
+      "required": true,
+      "placeholder": "your.email@example.com",
+      "description": "We'll send your certificate to this email"
+    }
+  ]
+}

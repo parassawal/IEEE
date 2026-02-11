@@ -1,11 +1,18 @@
 {
-    "forms": [
-        {
-            "id": "default",
-            "name": "IEEE Event Registration",
-            "description": "Default registration form",
-            "created": "2026-02-11",
-            "active": true
-        }
-    ]
+  "forms": [
+    {
+      "id": "default",
+      "name": "IEEE Event Registration",
+      "description": "Default registration form",
+      "created": "2026-02-11",
+      "active": true
+    },
+    {
+      "id": "form1",
+      "name": "IEEE Event Registration 2025",
+      "description": "ieee form",
+      "created": "2026-02-11",
+      "active": true
+    }
+  ]
 }
