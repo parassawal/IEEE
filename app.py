@@ -743,12 +743,12 @@ def view_responses_page():
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        # Create form-specific registration link - auto-detect URL
+        # Create form-specific registration link - using production URL
         try:
-            # Use localhost for local development
-            base_url = "http://localhost:8501"
+            # For Streamlit Cloud deployment
+            base_url = "https://ieee-mgmcet.streamlit.app"
         except:
-            base_url = "http://localhost:8501"
+            base_url = "https://ieee-mgmcet.streamlit.app"
         
         registration_url = f"{base_url}?page=register&form={selected_form_id}"
         
