@@ -21,5 +21,13 @@ output/
 *.swp
 *.swo
 
+
 # Streamlit
 .streamlit/secrets.toml
+
+# Secrets
+abiding-kingdom-487117-u4-9954f4231733.json
+*.json
+!config.json
+!forms/*.json
+!forms_index.json

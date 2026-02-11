@@ -447,21 +447,37 @@ def create_new_form(form_id, name, description):
     with open(get_form_responses_path(form_id), 'w') as f:
         json.dump([], f)
         
-    # Try creating worksheet in Google Sheet if connected
+    # Try creating a NEW Google Sheet for this form
     client = connect_to_gsheet()
     if client:
         try:
-            # Open the main spreadsheet (configured in next step)
-            # For now, we assume one spreadsheet is shared
-            if "sheet_url" in st.secrets["gsheets"]:
-                sheet = client.open_by_url(st.secrets["gsheets"]["sheet_url"])
-                if form_id not in [ws.title for ws in sheet.worksheets()]:
-                    worksheet = sheet.add_worksheet(title=form_id, rows=100, cols=20)
-                    # Add headers based on fields
-                    headers = ['timestamp'] + [f['id'] for f in form_config['fields']]
-                    worksheet.append_row(headers)
+            # 1. Create a new Spreadsheet
+            sh = client.create(f"IEEE - {name}")
+            
+            # 2. Share with Admin (if email is configured)
+            if "admin_email" in st.secrets["gsheets"] and st.secrets["gsheets"]["admin_email"] != "your-email@gmail.com":
+                try:
+                    sh.share(st.secrets["gsheets"]["admin_email"], perm_type='user', role='owner')
+                except:
+                    # Fallback if owner transfer fails (e.g. across domains), try editor
+                    sh.share(st.secrets["gsheets"]["admin_email"], perm_type='user', role='writer')
+            
+            # 3. Setup the first worksheet
+            worksheet = sh.get_worksheet(0)
+            worksheet.update_title("Responses")
+            
+            # 4. Add headers
+            headers = ['timestamp'] + [f['id'] for f in form_config['fields']]
+            worksheet.append_row(headers)
+            
+            # 5. Save the Sheet URL to the form config
+            form_config['gsheet_url'] = sh.url
+            save_form_by_id(form_id, form_config)
+            
+            st.success(f"✅ Created Google Sheet: {sh.title}")
+            
         except Exception as e:
-            pass 
+            st.error(f"Error creating Google Sheet: {e}")
 
 def delete_form(form_id):
     """Delete a form and its responses"""
@@ -470,6 +486,9 @@ def delete_form(form_id):
     index['forms'] = [f for f in index['forms'] if f['id'] != form_id]
     save_forms_index(index)
     
+    # Try getting sheet URL before deleting config
+    form_config = load_form_by_id(form_id)
+    
     # Delete files
     try:
         os.remove(get_form_config_path(form_id))
@@ -477,19 +496,8 @@ def delete_form(form_id):
     except:
         pass
         
-    # Try deleting from Google Sheet
-    client = connect_to_gsheet()
-    if client:
-        try:
-            if "sheet_url" in st.secrets["gsheets"]:
-                sheet = client.open_by_url(st.secrets["gsheets"]["sheet_url"])
-                try:
-                    worksheet = sheet.worksheet(form_id)
-                    sheet.del_worksheet(worksheet)
-                except:
-                    pass
-        except Exception:
-            pass
+    # Optional: Delete Google Sheet (often safer to keep it or just trash it)
+    # For now, we leave the sheet in Drive to avoid accidental data loss
 
 def load_form_responses(form_id):
     """Load responses for a specific form - Prefer Google Sheets"""
@@ -497,11 +505,12 @@ def load_form_responses(form_id):
     client = connect_to_gsheet()
     if client:
         try:
-            if "sheet_url" in st.secrets["gsheets"]:
-                sheet = client.open_by_url(st.secrets["gsheets"]["sheet_url"])
-                worksheet = sheet.worksheet(form_id)
+            # Check if this form has a linked sheet
+            config = load_form_by_id(form_id)
+            if config and 'gsheet_url' in config:
+                sheet = client.open_by_url(config['gsheet_url'])
+                worksheet = sheet.get_worksheet(0) # Assume first sheet
                 records = worksheet.get_all_records()
-                # Ensure all records have required fields to avoid KeyError
                 return records
         except Exception as e:
             pass
@@ -522,26 +531,15 @@ def save_form_response(form_id, response):
     client = connect_to_gsheet()
     if client:
         try:
-            if "sheet_url" in st.secrets["gsheets"]:
-                sheet = client.open_by_url(st.secrets["gsheets"]["sheet_url"])
-                
-                # Check if worksheet exists, create if not
-                try:
-                    worksheet = sheet.worksheet(form_id)
-                except:
-                    # Create and add headers
-                    worksheet = sheet.add_worksheet(title=form_id, rows=1000, cols=20)
-                    # Load config to get headers
-                    config = load_form_by_id(form_id)
-                    if config:
-                        headers = ['timestamp'] + [f['id'] for f in config['fields']]
-                        worksheet.append_row(headers)
+            # Get sheet URL from config
+            config = load_form_by_id(form_id)
+            if config and 'gsheet_url' in config:
+                sheet = client.open_by_url(config['gsheet_url'])
+                worksheet = sheet.get_worksheet(0)
                 
                 # Prepare row data based on headers
-                # We need to ensure order matches headers
                 headers = worksheet.row_values(1)
                 row_data = []
-                # Simple matching
                 for header in headers:
                     row_data.append(str(response.get(header, '')))
                 
