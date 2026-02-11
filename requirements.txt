@@ -6,3 +6,5 @@ streamlit>=1.30.0
 pdf2image>=1.16.0
 Pillow>=10.0.0
 qrcode[pil]>=7.4.0
+gspread==6.2.1
+google-auth==2.48.0
