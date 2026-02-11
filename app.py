@@ -299,6 +299,42 @@ def validate_form_data(data, form_config):
     
     return errors
 
+# Google Sheets Integration
+import gspread
+from google.oauth2.service_account import Credentials
+
+def connect_to_gsheet():
+    """Connect to Google Sheets using Streamlit Secrets"""
+    try:
+        # Check if secrets are available
+        if "gsheets" not in st.secrets:
+            return None
+
+        # Create credentials from secrets
+        secret_dict = {
+            "type": st.secrets["gsheets"]["type"],
+            "project_id": st.secrets["gsheets"]["project_id"],
+            "private_key_id": st.secrets["gsheets"]["private_key_id"],
+            "private_key": st.secrets["gsheets"]["private_key"],
+            "client_email": st.secrets["gsheets"]["client_email"],
+            "client_id": st.secrets["gsheets"]["client_id"],
+            "auth_uri": st.secrets["gsheets"]["auth_uri"],
+            "token_uri": st.secrets["gsheets"]["token_uri"],
+            "auth_provider_x509_cert_url": st.secrets["gsheets"]["auth_provider_x509_cert_url"],
+            "client_x509_cert_url": st.secrets["gsheets"]["client_x509_cert_url"]
+        }
+        
+        scopes = [
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive"
+        ]
+        
+        credentials = Credentials.from_service_account_info(secret_dict, scopes=scopes)
+        client = gspread.authorize(credentials)
+        return client
+    except Exception as e:
+        return None
+
 # Multiple forms management
 FORMS_DIR = "forms"
 FORMS_INDEX_FILE = "forms/forms_index.json"
@@ -410,6 +446,22 @@ def create_new_form(form_id, name, description):
     # Create empty responses file
     with open(get_form_responses_path(form_id), 'w') as f:
         json.dump([], f)
+        
+    # Try creating worksheet in Google Sheet if connected
+    client = connect_to_gsheet()
+    if client:
+        try:
+            # Open the main spreadsheet (configured in next step)
+            # For now, we assume one spreadsheet is shared
+            if "sheet_url" in st.secrets["gsheets"]:
+                sheet = client.open_by_url(st.secrets["gsheets"]["sheet_url"])
+                if form_id not in [ws.title for ws in sheet.worksheets()]:
+                    worksheet = sheet.add_worksheet(title=form_id, rows=100, cols=20)
+                    # Add headers based on fields
+                    headers = ['timestamp'] + [f['id'] for f in form_config['fields']]
+                    worksheet.append_row(headers)
+        except Exception as e:
+            pass 
 
 def delete_form(form_id):
     """Delete a form and its responses"""
@@ -424,9 +476,37 @@ def delete_form(form_id):
         os.remove(get_form_responses_path(form_id))
     except:
         pass
+        
+    # Try deleting from Google Sheet
+    client = connect_to_gsheet()
+    if client:
+        try:
+            if "sheet_url" in st.secrets["gsheets"]:
+                sheet = client.open_by_url(st.secrets["gsheets"]["sheet_url"])
+                try:
+                    worksheet = sheet.worksheet(form_id)
+                    sheet.del_worksheet(worksheet)
+                except:
+                    pass
+        except Exception:
+            pass
 
 def load_form_responses(form_id):
-    """Load responses for a specific form"""
+    """Load responses for a specific form - Prefer Google Sheets"""
+    # Try Google Sheets first
+    client = connect_to_gsheet()
+    if client:
+        try:
+            if "sheet_url" in st.secrets["gsheets"]:
+                sheet = client.open_by_url(st.secrets["gsheets"]["sheet_url"])
+                worksheet = sheet.worksheet(form_id)
+                records = worksheet.get_all_records()
+                # Ensure all records have required fields to avoid KeyError
+                return records
+        except Exception as e:
+            pass
+
+    # Fallback to local file
     responses_path = get_form_responses_path(form_id)
     if os.path.exists(responses_path):
         try:
@@ -437,10 +517,51 @@ def load_form_responses(form_id):
     return []
 
 def save_form_response(form_id, response):
-    """Save a response to a specific form"""
-    responses = load_form_responses(form_id)
+    """Save a response to a specific form - Save to BOTH"""
+    # 1. Save to Google Sheets
+    client = connect_to_gsheet()
+    if client:
+        try:
+            if "sheet_url" in st.secrets["gsheets"]:
+                sheet = client.open_by_url(st.secrets["gsheets"]["sheet_url"])
+                
+                # Check if worksheet exists, create if not
+                try:
+                    worksheet = sheet.worksheet(form_id)
+                except:
+                    # Create and add headers
+                    worksheet = sheet.add_worksheet(title=form_id, rows=1000, cols=20)
+                    # Load config to get headers
+                    config = load_form_by_id(form_id)
+                    if config:
+                        headers = ['timestamp'] + [f['id'] for f in config['fields']]
+                        worksheet.append_row(headers)
+                
+                # Prepare row data based on headers
+                # We need to ensure order matches headers
+                headers = worksheet.row_values(1)
+                row_data = []
+                # Simple matching
+                for header in headers:
+                    row_data.append(str(response.get(header, '')))
+                
+                worksheet.append_row(row_data)
+            
+        except Exception as e:
+            pass 
+
+    # 2. Save to Local JSON (Backup)
+    responses_path = get_form_responses_path(form_id)
+    responses = []
+    if os.path.exists(responses_path):
+        try:
+            with open(responses_path, 'r') as f:
+                responses = json.load(f)
+        except:
+            pass
+            
     responses.append(response)
-    with open(get_form_responses_path(form_id), 'w') as f:
+    with open(responses_path, 'w') as f:
         json.dump(responses, f, indent=2)
 
 # Static credentials
