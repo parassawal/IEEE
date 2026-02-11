@@ -299,6 +299,126 @@ def validate_form_data(data, form_config):
     
     return errors
 
+# Multiple forms management
+FORMS_DIR = "forms"
+FORMS_INDEX_FILE = "forms/forms_index.json"
+
+def load_forms_index():
+    """Load the forms index"""
+    if os.path.exists(FORMS_INDEX_FILE):
+        try:
+            with open(FORMS_INDEX_FILE, 'r') as f:
+                return json.load(f)
+        except:
+            return {"forms": []}
+    return {"forms": []}
+
+def save_forms_index(index):
+    """Save the forms index"""
+    os.makedirs(FORMS_DIR, exist_ok=True)
+    with open(FORMS_INDEX_FILE, 'w') as f:
+        json.dump(index, f, indent=2)
+
+def get_form_config_path(form_id):
+    """Get the path to a form's configuration file"""
+    return f"{FORMS_DIR}/{form_id}.json"
+
+def get_form_responses_path(form_id):
+    """Get the path to a form's responses file"""
+    return f"{FORMS_DIR}/{form_id}_responses.json"
+
+def load_form_by_id(form_id):
+    """Load a specific form configuration"""
+    form_path = get_form_config_path(form_id)
+    if os.path.exists(form_path):
+        try:
+            with open(form_path, 'r') as f:
+                return json.load(f)
+        except:
+            return None
+    return None
+
+def save_form_by_id(form_id, config):
+    """Save a specific form configuration"""
+    os.makedirs(FORMS_DIR, exist_ok=True)
+    form_path = get_form_config_path(form_id)
+    with open(form_path, 'w') as f:
+        json.dump(config, f, indent=2)
+
+def create_new_form(form_id, name, description):
+    """Create a new form"""
+    # Add to index
+    index = load_forms_index()
+    index['forms'].append({
+        'id': form_id,
+        'name': name,
+        'description': description,
+        'created': datetime.now().strftime("%Y-%m-%d"),
+        'active': True
+    })
+    save_forms_index(index)
+    
+    # Create form config
+    form_config = {
+        'title': name,
+        'description': description,
+        'fields': [
+            {
+                'id': 'name',
+                'type': 'text',
+                'label': 'Full Name',
+                'required': True,
+                'placeholder': 'Enter your full name',
+                'description': 'As it should appear on the certificate'
+            },
+            {
+                'id': 'email',
+                'type': 'email',
+                'label': 'Email Address',
+                'required': True,
+                'placeholder': 'your.email@example.com',
+                'description': "We'll send your certificate to this email"
+            }
+        ]
+    }
+    save_form_by_id(form_id, form_config)
+    
+    # Create empty responses file
+    with open(get_form_responses_path(form_id), 'w') as f:
+        json.dump([], f)
+
+def delete_form(form_id):
+    """Delete a form and its responses"""
+    # Remove from index
+    index = load_forms_index()
+    index['forms'] = [f for f in index['forms'] if f['id'] != form_id]
+    save_forms_index(index)
+    
+    # Delete files
+    try:
+        os.remove(get_form_config_path(form_id))
+        os.remove(get_form_responses_path(form_id))
+    except:
+        pass
+
+def load_form_responses(form_id):
+    """Load responses for a specific form"""
+    responses_path = get_form_responses_path(form_id)
+    if os.path.exists(responses_path):
+        try:
+            with open(responses_path, 'r') as f:
+                return json.load(f)
+        except:
+            return []
+    return []
+
+def save_form_response(form_id, response):
+    """Save a response to a specific form"""
+    responses = load_form_responses(form_id)
+    responses.append(response)
+    with open(get_form_responses_path(form_id), 'w') as f:
+        json.dump(responses, f, indent=2)
+
 # Static credentials
 ADMIN_EMAIL = "mgmcet.ieee@gmail.com"
 ADMIN_PASSWORD = "earthling-plasma5-overstock-explain"
@@ -422,7 +542,19 @@ def generate_certificates_zip(generator, names, config):
 
 def registration_page():
     """Enhanced Google Forms-style registration page"""
-    form_config = load_form_config()
+    # Get form ID from URL parameter
+    try:
+        form_id = st.query_params.get("form", "default")
+    except:
+        form_id = "default"
+    
+    # Load form configuration
+    form_config = load_form_by_id(form_id)
+    
+    if not form_config:
+        st.error("❌ Form not found!")
+        st.info("Please check the registration link and try again.")
+        return
     
     # Header with IEEE branding
     st.markdown(f'<h1 class="main-header">{form_config["title"]}</h1>', unsafe_allow_html=True)
@@ -518,15 +650,12 @@ def registration_page():
                 registration.update(form_data)
                 
                 # Check for duplicate (using email if present)
-                registrations = load_registrations()
+                responses = load_form_responses(form_id)
                 email_field = form_data.get('email', '')
-                if email_field and any(r.get('email', '').lower() == email_field.lower() for r in registrations):
+                if email_field and any(r.get('email', '').lower() == email_field.lower() for r in responses):
                     st.warning("⚠️ This email is already registered!")
                 else:
-                    registrations.append(registration)
-                    with open(REGISTRATIONS_FILE, 'w') as f:
-                        json.dump(registrations, f, indent=2)
-                    
+                    save_form_response(form_id, registration)
                     st.success("✅ Registration successful!")
                     st.balloons()
                     st.info("🎓 You're registered! You'll receive your certificate after the event.")
@@ -542,7 +671,22 @@ def view_responses_page():
     """Admin page to view and manage registrations"""
     st.markdown('<h2 class="main-header">📊 Registration Responses</h2>', unsafe_allow_html=True)
     
-    registrations = load_registrations()
+    # Form selector
+    forms_index = load_forms_index()
+    forms_list = forms_index.get('forms', [])
+    
+    if not forms_list:
+        st.info("📭 No forms created yet. Create a form in the Form Builder tab first!")
+        return
+    
+    form_names = {f['id']: f['name'] for f in forms_list}
+    selected_form_id = st.selectbox(
+        "Select Form",
+        options=list(form_names.keys()),
+        format_func=lambda x: form_names[x]
+    )
+    
+    registrations = load_form_responses(selected_form_id)
     
     # Display registration link and QR code
     st.subheader("🔗 Share Registration Link")
@@ -550,13 +694,15 @@ def view_responses_page():
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        # Get current URL and create registration link
+        # Create form-specific registration link
         try:
-            registration_url = f"{st.query_params.get('url', 'https://your-app.streamlit.app')}?page=register"
+            base_url = st.query_params.get('url', 'https://your-app.streamlit.app')
         except:
-            registration_url = "https://your-app.streamlit.app?page=register"
+            base_url = "https://your-app.streamlit.app"
         
-        st.text_input("Registration Link", value=registration_url, key="reg_link")
+        registration_url = f"{base_url}?page=register&form={selected_form_id}"
+        
+        st.text_input("Registration Link", value=registration_url, key=f"reg_link_{selected_form_id}")
         if st.button("📋 Copy Link"):
             st.success("Link copied! (Use browser copy button)")
     
@@ -573,7 +719,7 @@ def view_responses_page():
                 st.download_button(
                     label="💾 Download QR Code",
                     data=buf.getvalue(),
-                    file_name="event_registration_qr.png",
+                    file_name=f"{selected_form_id}_registration_qr.png",
                     mime="image/png"
                 )
             except Exception as e:
@@ -610,48 +756,138 @@ def view_responses_page():
             st.download_button(
                 label="📥 Export to CSV",
                 data=csv,
-                file_name="registrations.csv",
+                file_name=f"{selected_form_id}_registrations.csv",
                 mime="text/csv"
             )
         
         with col2:
             if st.button("🎓 Use for Certificates"):
-                st.session_state.participants_data = [
-                    {'name': r['name'], 'email': r['email']} 
-                    for r in registrations
-                ]
+                # Try to use name and email fields if they exist
+                participants = []
+                for r in registrations:
+                    participant = {
+                        'name': r.get('name', r.get('full_name', 'Unknown')),
+                        'email': r.get('email', '')
+                    }
+                    participants.append(participant)
+                
+                st.session_state.participants_data = participants
                 st.success(f"✅ Loaded {len(registrations)} participants for certificate generation!")
-                st.info("👉 Go to the main tab to generate certificates")
+                st.info("👉 Go to the Certificate Generator tab to generate certificates")
         
         # Delete option
         st.divider()
         st.subheader("🗑️ Manage Registrations")
-        email_to_delete = st.selectbox(
-            "Select email to delete",
-            [r['email'] for r in registrations]
-        )
-        if st.button("❌ Delete Selected", type="secondary"):
-            delete_registration(email_to_delete)
-            st.success("Registration deleted!")
-            st.rerun()
+        if 'email' in registrations[0]:
+            email_to_delete = st.selectbox(
+                "Select email to delete",
+                [r['email'] for r in registrations if 'email' in r]
+            )
+            if st.button("❌ Delete Selected", type="secondary"):
+                # Delete by email
+                updated_responses = [r for r in registrations if r.get('email') != email_to_delete]
+                with open(get_form_responses_path(selected_form_id), 'w') as f:
+                    json.dump(updated_responses, f, indent=2)
+                st.success("Registration deleted!")
+                st.rerun()
+        else:
+            st.info("No email field in this form. Cannot delete responses.")
     else:
         st.info("📭 No registrations yet. Share the registration link to start collecting responses!")
 
 def form_builder_page():
     """Admin page to build and customize registration forms"""
     st.markdown('<h2 class="main-header">📝 Form Builder</h2>', unsafe_allow_html=True)
-    st.info("🛠️ Customize your registration form by adding, editing, or removing fields")
     
-    # Load current form config
-    form_config = load_form_config()
+    # Form Manager Section
+    st.subheader("📋 My Forms")
+    
+    forms_index = load_forms_index()
+    forms_list = forms_index.get('forms', [])
+    
+    #Create new form
+    with st.expander("➕ Create New Form", expanded=False):
+        with st.form("create_form"):
+            col1, col2 = st.columns(2)
+            with col1:
+                new_form_name = st.text_input("Form Name", placeholder="e.g., Workshop 2024")
+                new_form_id = st.text_input("Form ID (URL-safe)", placeholder="e.g., workshop-2024")
+            with col2:
+                new_form_desc = st.text_area("Description", placeholder="Short description of this event")
+            
+            if st.form_submit_button("🚀 Create Form", use_container_width=True):
+                if new_form_name and new_form_id:
+                    # Check if ID already exists
+                    if any(f['id'] == new_form_id for f in forms_list):
+                        st.error("❌ Form ID already exists! Please use a different ID.")
+                    else:
+                        create_new_form(new_form_id, new_form_name, new_form_desc)
+                        st.success(f"✅ Form '{new_form_name}' created!")
+                        st.rerun()
+                else:
+                    st.error("❌ Form name and ID are required!")
+    
+    # Display existing forms
+    if not forms_list:
+        st.info("📭 No forms yet. Create your first form above!")
+    else:
+        for form in forms_list:
+            col1, col2, col3, col4 = st.columns([3, 2, 1, 1])
+            responses_count = len(load_form_responses(form['id']))
+            
+            with col1:
+                st.markdown(f"**{form['name']}**")
+                st.caption(form['description'])
+            with col2:
+                st.metric("Responses", responses_count)
+            with col3:
+                if st.button("✏️ Edit", key=f"edit_{form['id']}", use_container_width=True):
+                    st.session_state.selected_form = form['id']
+            with col4:
+                if form['id'] != 'default':  # Don't allow deleting default form
+                    if st.button("🗑️", key=f"delete_{form['id']}", use_container_width=True):
+                        delete_form(form['id'])
+                        st.success(f"Form '{form['name']}' deleted!")
+                        st.rerun()
+    
+    st.divider()
+    
+    # Form Editor Section
+    if 'selected_form' not in st.session_state:
+        st.session_state.selected_form = 'default'
+    
+    selected_form_id = st.session_state.selected_form
+    
+    # Form selector
+    form_names = {f['id']: f['name'] for f in forms_list}
+    if form_names:
+        selected_name = form_names.get(selected_form_id, list(form_names.values())[0])
+        selected = st.selectbox(
+            "Currently Editing", 
+            options=list(form_names.keys()),
+            format_func=lambda x: form_names[x],
+            index=list(form_names.keys()).index(selected_form_id) if selected_form_id in form_names else 0
+        )
+        if selected != selected_form_id:
+            st.session_state.selected_form = selected
+            st.rerun()
+    
+    # Load selected form config
+    form_config = load_form_by_id(selected_form_id)
+    
+    if not form_config:
+        st.error("❌ Selected form not found!")
+        return
+    
+    st.info(f"🛠️ Customizing: **{form_config.get('title', 'Untitled')}**")
     
     # Form title and description
     st.subheader("📋 Form Details")
     col1, col2 = st.columns(2)
     with col1:
-        form_config['title'] = st.text_input("Form Title", value=form_config['title'])
+        form_config['title'] = st.text_input("Form Title", value=form_config.get('title', ''))
     with col2:
-        form_config['description'] = st.text_area("Form Description", value=form_config['description'], height=100)
+        form_config['description'] = st.text_area("Form Description", value=form_config.get('description', ''), height=100)
     
     st.divider()
     
@@ -691,7 +927,7 @@ def form_builder_page():
                 st.write("")
                 if st.button("🗑️ Delete", key=f"del_{idx}", type="secondary"):
                     form_config['fields'].pop(idx)
-                    save_form_config(form_config)
+                    save_form_by_id(selected_form_id, form_config)
                     st.rerun()
     
     st.divider()
@@ -733,7 +969,7 @@ def form_builder_page():
                     new_field['options'] = new_options
                 
                 form_config['fields'].append(new_field)
-                save_form_config(form_config)
+                save_form_by_id(selected_form_id, form_config)
                 st.success(f"✅ Field '{new_label}' added!")
                 st.rerun()
             else:
@@ -745,7 +981,7 @@ def form_builder_page():
     col1, col2 = st.columns([1, 3])
     with col1:
         if st.button("💾 Save Form Configuration", type="primary", use_container_width=True):
-            save_form_config(form_config)
+            save_form_by_id(selected_form_id, form_config)
             st.success("✅ Form configuration saved!")
             st.balloons()
 

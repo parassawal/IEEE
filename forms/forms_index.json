@@ -1,0 +1,11 @@
+{
+    "forms": [
+        {
+            "id": "default",
+            "name": "IEEE Event Registration",
+            "description": "Default registration form",
+            "created": "2026-02-11",
+            "active": true
+        }
+    ]
+}
