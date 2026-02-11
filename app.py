@@ -378,6 +378,30 @@ def create_new_form(form_id, name, description):
                 'required': True,
                 'placeholder': 'your.email@example.com',
                 'description': "We'll send your certificate to this email"
+            },
+            {
+                'id': 'department',
+                'type': 'text',
+                'label': 'Department Name',
+                'required': True,
+                'placeholder': 'e.g. Computer Engineering',
+                'description': 'Your current department'
+            },
+            {
+                'id': 'roll_no',
+                'type': 'text',
+                'label': 'Roll Number',
+                'required': True,
+                'placeholder': 'Enter your Roll Number',
+                'description': 'University/College Roll Number'
+            },
+            {
+                'id': 'phone',
+                'type': 'tel',
+                'label': 'Phone Number',
+                'required': True,
+                'placeholder': 'Enter your phone number',
+                'description': 'Contact number'
             }
         ]
     }
@@ -563,13 +587,38 @@ def registration_page():
     # Google Forms-style CSS
     st.markdown("""
     <style>
+        .main-header {
+            text-align: center;
+            color: #00629B;
+            font-family: 'Helvetica Neue', sans-serif;
+            margin-bottom: 0.5rem;
+        }
+        .sub-header {
+            text-align: center;
+            color: #666;
+            margin-bottom: 2rem;
+            font-size: 1.1rem;
+        }
         .form-container {
             max-width: 700px;
             margin: 0 auto;
-            padding: 2rem;
+            padding: 2.5rem;
             background: white;
             border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border-top: 8px solid #00629B;
+        }
+        .stTextInput label, .stNumberInput label, .stSelectbox label, .stTextArea label, .stDateInput label {
+            font-weight: 600;
+            color: #333;
+        }
+        div[data-testid="stForm"] {
+            border: 1px solid #e0e0e0;
+            padding: 2rem;
+            border-radius: 8px;
+            background-color: #ffffff;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            border-top: 10px solid #00629B;
         }
     </style>
     """, unsafe_allow_html=True)

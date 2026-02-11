@@ -19,12 +19,28 @@
       "description": "We'll send your certificate to this email"
     },
     {
-      "id": "num",
-      "type": "number",
-      "label": "phone number",
-      "required": false,
-      "placeholder": "enter number",
-      "description": ""
+      "id": "department",
+      "type": "text",
+      "label": "Department Name",
+      "required": true,
+      "placeholder": "e.g. Computer Engineering",
+      "description": "Your current department"
+    },
+    {
+      "id": "roll_no",
+      "type": "text",
+      "label": "Roll Number",
+      "required": true,
+      "placeholder": "Enter your Roll Number",
+      "description": "University/College Roll Number"
+    },
+    {
+      "id": "phone",
+      "type": "tel",
+      "label": "Phone Number",
+      "required": true,
+      "placeholder": "Enter your phone number",
+      "description": "Contact number"
     }
   ]
 }
