@@ -102,10 +102,11 @@ IEEE Student Branch"""
             filename_template: Template for certificate filenames
             
         Returns:
-            Tuple of (successful_count, failed_count)
+            Tuple of (successful_count, failed_count, failed_list)
         """
         successful = 0
         failed = 0
+        failed_list = []
         
         for i, participant in enumerate(participants, 1):
             name = participant.get('name', '')
@@ -114,6 +115,7 @@ IEEE Student Branch"""
             if not email or not name:
                 print(f"  ✗ Skipping participant {i}: Missing name or email")
                 failed += 1
+                failed_list.append({'name': name, 'email': email, 'reason': 'Missing name or email'})
                 continue
             
             # Clean name for filename
@@ -128,6 +130,7 @@ IEEE Student Branch"""
                 print(f"  ✓ Email sent successfully")
             else:
                 failed += 1
+                failed_list.append({'name': name, 'email': email, 'reason': 'Sending failed'})
                 print(f"  ✗ Failed to send email")
         
-        return successful, failed
+        return successful, failed, failed_list

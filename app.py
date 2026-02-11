@@ -1530,7 +1530,7 @@ IEEE Student Branch MGMCET"""
                             email_sender = EmailSender(email_config)
                             
                             status_text.text("Sending emails...")
-                            successful, failed = email_sender.send_batch(
+                            successful, failed, failed_list = email_sender.send_batch(
                                 st.session_state.participants_data,
                                 temp_cert_dir,
                                 st.session_state.config.get('filename_template', '{name}_Certificate.pdf')
@@ -1546,7 +1546,13 @@ IEEE Student Branch MGMCET"""
                             if failed == 0:
                                 st.success(f"🎉 Successfully sent {successful} emails!")
                             else:
-                                st.warning(f"✅ Sent {successful} emails\n❌ Failed: {failed}")
+                                st.warning(f"✅ Sent {successful} emails")
+                                st.error(f"❌ Failed to send {failed} emails")
+                                
+                                # Show failed emails
+                                st.write("### ❌ Failed Recipients")
+                                failed_df = pd.DataFrame(failed_list)
+                                st.dataframe(failed_df, use_container_width=True)
                             
                             status_text.empty()
                             progress_bar.empty()
