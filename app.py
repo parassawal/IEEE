@@ -139,6 +139,23 @@ st.markdown("""
         border-top: 2px solid #00629B;
         opacity: 0.3;
     }
+    
+    /* Hide GitHub and deployment menu items */
+    [data-testid="stToolbar"] {
+        display: none;
+    }
+    
+    header[data-testid="stHeader"] {
+        display: none;
+    }
+    
+    .viewerBadge_container__1QSob {
+        display: none;
+    }
+    
+    footer {
+        visibility: hidden;
+    }
 </style>
 """, unsafe_allow_html=True)
 
