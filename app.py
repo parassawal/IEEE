@@ -17,6 +17,8 @@ from email_sender import EmailSender
 from pypdf import PdfReader
 from pdf2image import convert_from_bytes
 from PIL import Image
+import qrcode
+from datetime import datetime
 
 # Page configuration
 st.set_page_config(
@@ -183,6 +185,62 @@ if 'authenticated' not in st.session_state:
 if 'send_emails_enabled' not in st.session_state:
     st.session_state.send_emails_enabled = False
 
+# Registration file path
+REGISTRATIONS_FILE = "registrations.json"
+
+# Helper functions for registration management
+def load_registrations():
+    """Load all registrations from JSON file"""
+    if os.path.exists(REGISTRATIONS_FILE):
+        try:
+            with open(REGISTRATIONS_FILE, 'r') as f:
+                return json.load(f)
+        except:
+            return []
+    return []
+
+def save_registration(name, email):
+    """Save a new registration"""
+    registrations = load_registrations()
+    
+    # Check for duplicate email
+    if any(r['email'].lower() == email.lower() for r in registrations):
+        return False, "Email already registered!"
+    
+    # Add new registration
+    new_registration = {
+        'name': name,
+        'email': email,
+        'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+    registrations.append(new_registration)
+    
+    # Save to file
+    with open(REGISTRATIONS_FILE, 'w') as f:
+        json.dump(registrations, f, indent=2)
+    
+    return True, "Registration successful!"
+
+def delete_registration(email):
+    """Delete a registration by email"""
+    registrations = load_registrations()
+    registrations = [r for r in registrations if r['email'].lower() != email.lower()]
+    with open(REGISTRATIONS_FILE, 'w') as f:
+        json.dump(registrations, f, indent=2)
+
+def generate_qr_code(url):
+    """Generate QR code for a URL"""
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="#00629B", back_color="white")
+    return img
+
 # Static credentials
 ADMIN_EMAIL = "mgmcet.ieee@gmail.com"
 ADMIN_PASSWORD = "earthling-plasma5-overstock-explain"
@@ -304,100 +362,249 @@ def generate_certificates_zip(generator, names, config):
     zip_buffer.seek(0)
     return zip_buffer
 
-# Check authentication
-if not st.session_state.authenticated:
+def registration_page():
+    """Public registration page - no login required"""
+    st.markdown('<h1 class="main-header">⚡ IEEE Event Registration</h1>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">Register for our event | IEEE Student Branch MGMCET</p>', unsafe_allow_html=True)
+    
+    st.info("📝 Fill out the form below to register for the event. You'll receive your certificate after the event!")
+    
+    with st.form("registration_form"):
+        col1, col2, col3 = st.columns([1, 2, 1])
+        
+        with col2:
+            name = st.text_input("📛 Full Name *", placeholder="Enter your full name")
+            email = st.text_input("📧 Email Address *", placeholder="Enter your email")
+            
+            submit = st.form_submit_button("🚀 Register Now", use_container_width=True)
+            
+            if submit:
+                if not name or not email:
+                    st.error("❌ Please fill in all fields!")
+                elif "@" not in email or "." not in email:
+                    st.error("❌ Please enter a valid email address!")
+                else:
+                    success, message = save_registration(name.strip(), email.strip())
+                    if success:
+                        st.success(f"✅ {message}")
+                        st.balloons()
+                        st.info("🎓 You're registered! You'll receive your certificate after the event.")
+                    else:
+                        st.warning(f"⚠️ {message}")
+    
+    st.divider()
+    st.markdown("""
+    <div style="text-align: center; color: #666; padding: 1rem 0;">
+        <p style="font-size: 0.9rem;">Powered by IEEE Student Branch MGMCET</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+def view_responses_page():
+    """Admin page to view and manage registrations"""
+    st.markdown('<h2 class="main-header">📊 Registration Responses</h2>', unsafe_allow_html=True)
+    
+    registrations = load_registrations()
+    
+    # Display registration link and QR code
+    st.subheader("🔗 Share Registration Link")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        # Get current URL and create registration link
+        try:
+            registration_url = f"{st.query_params.get('url', 'https://your-app.streamlit.app')}?page=register"
+        except:
+            registration_url = "https://your-app.streamlit.app?page=register"
+        
+        st.text_input("Registration Link", value=registration_url, key="reg_link")
+        if st.button("📋 Copy Link"):
+            st.success("Link copied! (Use browser copy button)")
+    
+    with col2:
+        st.write("**QR Code**")
+        if st.button("📥 Generate & Download QR Code"):
+            try:
+                qr_img = generate_qr_code(registration_url)
+                buf = BytesIO()
+                qr_img.save(buf, format='PNG')
+                buf.seek(0)
+                
+                st.image(buf, width=200)
+                st.download_button(
+                    label="💾 Download QR Code",
+                    data=buf.getvalue(),
+                    file_name="event_registration_qr.png",
+                    mime="image/png"
+                )
+            except Exception as e:
+                st.error(f"Error generating QR code: {e}")
+    
+    st.divider()
+    
+    # Statistics
+    st.subheader("📈 Statistics")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Total Registrations", len(registrations))
+    with col2:
+        if registrations:
+            latest = registrations[-1]['timestamp']
+            st.metric("Latest Registration", latest.split()[0])
+    with col3:
+        st.metric("Status", "🟢 Active")
+    
+    st.divider()
+    
+    # Responses table
+    st.subheader("👥 All Registrations")
+    
+    if registrations:
+        df = pd.DataFrame(registrations)
+        st.dataframe(df, use_container_width=True)
+        
+        # Export options
+        col1, col2, col3 = st.columns([1, 1, 2])
+        
+        with col1:
+            csv = df.to_csv(index=False)
+            st.download_button(
+                label="📥 Export to CSV",
+                data=csv,
+                file_name="registrations.csv",
+                mime="text/csv"
+            )
+        
+        with col2:
+            if st.button("🎓 Use for Certificates"):
+                st.session_state.participants_data = [
+                    {'name': r['name'], 'email': r['email']} 
+                    for r in registrations
+                ]
+                st.success(f"✅ Loaded {len(registrations)} participants for certificate generation!")
+                st.info("👉 Go to the main tab to generate certificates")
+        
+        # Delete option
+        st.divider()
+        st.subheader("🗑️ Manage Registrations")
+        email_to_delete = st.selectbox(
+            "Select email to delete",
+            [r['email'] for r in registrations]
+        )
+        if st.button("❌ Delete Selected", type="secondary"):
+            delete_registration(email_to_delete)
+            st.success("Registration deleted!")
+            st.rerun()
+    else:
+        st.info("📭 No registrations yet. Share the registration link to start collecting responses!")
+
+# Check if we're on the registration page (public access)
+try:
+    page = st.query_params.get("page", "")
+except:
+    page = ""
+
+if page == "register":
+    # Public registration page - no authentication needed
+    registration_page()
+elif not st.session_state.authenticated:
+    # Admin login required
     login_page()
 else:
     # Main app layout (only shown when authenticated)
     st.markdown('<h1 class="main-header">⚡ IEEE Certificate Generator</h1>', unsafe_allow_html=True)
     st.markdown('<p class="sub-header">Advancing Technology for Humanity | IEEE Student Branch MGMCET</p>', unsafe_allow_html=True)
 
-    # Sidebar for configuration
-    with st.sidebar:
-        st.header("⚙️ Configuration")
-        
-        # Font settings
-        st.subheader("Font Settings")
-        st.session_state.config['font_name'] = st.selectbox(
-            "Font",
-            ['Helvetica-Bold', 'Helvetica', 'Times-Bold', 'Times-Roman', 'Courier-Bold', 'Courier'],
-            index=0
-        )
-        
-        st.session_state.config['font_size'] = st.slider(
-            "Font Size",
-            min_value=12,
-            max_value=72,
-            value=st.session_state.config['font_size']
-        )
-        
-        st.session_state.config['font_color'] = st.color_picker(
-            "Font Color",
-            value=st.session_state.config['font_color']
-        )
-        
-        # Alignment
-        st.session_state.config['alignment'] = st.selectbox(
-            "Alignment",
-            ['center', 'left', 'right'],
-            index=0
-        )
-        
-        st.divider()
-        
-        # Position settings
-        st.subheader("Position Settings")
-        st.session_state.config['x_position'] = st.number_input(
-            "X Position",
-            min_value=0,
-            max_value=1000,
-            value=st.session_state.config['x_position'],
-            help="Horizontal position of the text"
-        )
-        
-        st.session_state.config['y_position'] = st.number_input(
-            "Y Position",
-            min_value=0,
-            max_value=1000,
-            value=st.session_state.config['y_position'],
-            help="Vertical position of the text"
-        )
-        
-        st.divider()
-        
-        # Save/Load configuration
-        st.subheader("💾 Configuration")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if st.button("Save Config"):
-                config_json = json.dumps(st.session_state.config, indent=2)
-                st.download_button(
-                    label="Download",
-                    data=config_json,
-                    file_name="config.json",
-                    mime="application/json"
-                )
-        
-        with col2:
-            uploaded_config = st.file_uploader("Load Config", type=['json'], key='config_upload')
-            if uploaded_config:
-                try:
-                    config_data = json.load(uploaded_config)
-                    st.session_state.config.update(config_data)
-                    st.success("Config loaded!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error loading config: {e}")
-        
-        # Logout button at bottom
-        st.divider()
-        if st.button("🚪 Logout", type="secondary", use_container_width=True):
-            st.session_state.authenticated = False
-            st.rerun()
+    # Add tabs for navigation
+    tab1, tab2 = st.tabs(["🎓 Certificate Generator", "📊 View Responses"])
+    
+    with tab1:
+        # Original certificate generation code (sidebar + main content)
+        with st.sidebar:
+            st.header("⚙️ Configuration")
+            
+            # Font settings
+            st.subheader("Font Settings")
+            st.session_state.config['font_name'] = st.selectbox(
+                "Font",
+                ['Helvetica-Bold', 'Helvetica', 'Times-Bold', 'Times-Roman', 'Courier-Bold', 'Courier'],
+                index=0
+            )
+            
+            st.session_state.config['font_size'] = st.slider(
+                "Font Size",
+                min_value=12,
+                max_value=72,
+                value=st.session_state.config['font_size']
+            )
+            
+            st.session_state.config['font_color'] = st.color_picker(
+                "Font Color",
+                value=st.session_state.config['font_color']
+            )
+            
+            # Alignment
+            st.session_state.config['alignment'] = st.selectbox(
+                "Alignment",
+                ['center', 'left', 'right'],
+                index=0
+            )
+            
+            st.divider()
+            
+            # Position settings
+            st.subheader("Position Settings")
+            st.session_state.config['x_position'] = st.number_input(
+                "X Position",
+                min_value=0,
+                max_value=1000,
+                value=st.session_state.config['x_position'],
+                help="Horizontal position of the text"
+            )
+            
+            st.session_state.config['y_position'] = st.number_input(
+                "Y Position",
+                min_value=0,
+                max_value=1000,
+                value=st.session_state.config['y_position'],
+                help="Vertical position of the text"
+            )
+            
+            st.divider()
+            
+            # Save/Load configuration
+            st.subheader("💾 Configuration")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if st.button("Save Config"):
+                    config_json = json.dumps(st.session_state.config, indent=2)
+                    st.download_button(
+                        label="Download",
+                        data=config_json,
+                        file_name="config.json",
+                        mime="application/json"
+                    )
+            
+            with col2:
+                uploaded_config = st.file_uploader("Load Config", type=['json'], key='config_upload')
+                if uploaded_config:
+                    try:
+                        config_data = json.load(uploaded_config)
+                        st.session_state.config.update(config_data)
+                        st.success("Config loaded!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error loading config: {e}")
+            
+            # Logout button at bottom
+            st.divider()
+            if st.button("🚪 Logout", type="secondary", use_container_width=True):
+                st.session_state.authenticated = False
+                st.rerun()
 
-    # Main content area
+        # Main content area
     col1, col2 = st.columns([1, 1])
 
     with col1:
@@ -686,17 +893,21 @@ IEEE Student Branch MGMCET"""
                             st.error(f"Error: {e}")
                             st.exception(e)
 
-    else:
-        st.info("👆 Please upload both a template PDF and participants CSV to continue")
+        else:
+            st.info("👆 Please upload both a template PDF and participants CSV to continue")
 
-    # Footer
-    st.divider()
-    st.markdown("""
-    <div style="text-align: center; color: #003D5C; padding: 2rem 0;">
-        <p style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem;">⚡ IEEE Student Branch MGMCET</p>
-        <p style="font-size: 0.95rem; color: #00629B; margin-bottom: 1rem;">Advancing Technology for Humanity</p>
-        <p style="font-size: 0.85rem; color: #666;">Certificate Generator • Built with Streamlit</p>
-        <p style="font-size: 0.8rem; color: #888; margin-top: 1rem;">Need help? Check the sidebar for configuration options</p>
-    </div>
-    """, unsafe_allow_html=True)
+        # Footer
+        st.divider()
+        st.markdown("""
+        <div style="text-align: center; color: #003D5C; padding: 2rem 0;">
+            <p style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem;">⚡ IEEE Student Branch MGMCET</p>
+            <p style="font-size: 0.95rem; color: #00629B; margin-bottom: 1rem;">Advancing Technology for Humanity</p>
+            <p style="font-size: 0.85rem; color: #666;">Certificate Generator • Built with Streamlit</p>
+            <p style="font-size: 0.8rem; color: #888; margin-top: 1rem;">Need help? Check the sidebar for configuration options</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with tab2:
+        # View Responses tab
+        view_responses_page()
 
