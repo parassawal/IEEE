@@ -189,6 +189,12 @@ ADMIN_PASSWORD = "earthling-plasma5-overstock-explain"
 
 def login_page():
     """Display login page"""
+    # Display IEEE logo
+    if os.path.exists("assets/ieee_logo.png"):
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+            st.image("assets/ieee_logo.png", width=200)
+    
     st.markdown('<h1 class="main-header">⚡ IEEE Certificate Generator</h1>', unsafe_allow_html=True)
     st.markdown('<p class="sub-header">Secure Login | IEEE Student Branch MGMCET</p>', unsafe_allow_html=True)
     
@@ -309,6 +315,13 @@ if not st.session_state.authenticated:
     login_page()
 else:
     # Main app layout (only shown when authenticated)
+    # Display IEEE logo at top
+    if os.path.exists("assets/ieee_logo.png"):
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+            st.image("assets/ieee_logo.png", width=180)
+        st.markdown("<br>", unsafe_allow_html=True)
+    
     st.markdown('<h1 class="main-header">⚡ IEEE Certificate Generator</h1>', unsafe_allow_html=True)
     st.markdown('<p class="sub-header">Advancing Technology for Humanity | IEEE Student Branch MGMCET</p>', unsafe_allow_html=True)
 
