@@ -1,0 +1,22 @@
+{
+    "title": "IEEE Event Registration",
+    "description": "Register for our upcoming IEEE event. Fill out all required fields below.",
+    "fields": [
+        {
+            "id": "name",
+            "type": "text",
+            "label": "Full Name",
+            "required": true,
+            "placeholder": "Enter your full name",
+            "description": "As it should appear on the certificate"
+        },
+        {
+            "id": "email",
+            "type": "email",
+            "label": "Email Address",
+            "required": true,
+            "placeholder": "your.email@example.com",
+            "description": "We'll send your certificate to this email"
+        }
+    ]
+}

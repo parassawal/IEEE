@@ -241,6 +241,64 @@ def generate_qr_code(url):
     img = qr.make_image(fill_color="#00629B", back_color="white")
     return img
 
+# Form configuration file path
+FORM_CONFIG_FILE = "form_config.json"
+
+def load_form_config():
+    """Load form configuration from JSON file"""
+    if os.path.exists(FORM_CONFIG_FILE):
+        try:
+            with open(FORM_CONFIG_FILE, 'r') as f:
+                return json.load(f)
+        except:
+            return get_default_form_config()
+    return get_default_form_config()
+
+def get_default_form_config():
+    """Return default form configuration"""
+    return {
+        "title": "IEEE Event Registration",
+        "description": "Register for our upcoming IEEE event",
+        "fields": [
+            {
+                "id": "name",
+                "type": "text",
+                "label": "Full Name",
+                "required": True,
+                "placeholder": "Enter your full name",
+                "description": "As it should appear on the certificate"
+            },
+            {
+                "id": "email",
+                "type": "email",
+                "label": "Email Address",
+                "required": True,
+                "placeholder": "your.email@example.com",
+                "description": "We'll send your certificate to this email"
+            }
+        ]
+    }
+
+def save_form_config(config):
+    """Save form configuration to JSON file"""
+    with open(FORM_CONFIG_FILE, 'w') as f:
+        json.dump(config, f, indent=2)
+
+def validate_form_data(data, form_config):
+    """Validate form submission data"""
+    errors = []
+    for field in form_config['fields']:
+        field_id = field['id']
+        if field.get('required', False) and not data.get(field_id):
+            errors.append(f"{field['label']} is required")
+        
+        # Email validation
+        if field['type'] == 'email' and data.get(field_id):
+            if '@' not in data[field_id] or '.' not in data[field_id]:
+                errors.append(f"{field['label']} must be a valid email")
+    
+    return errors
+
 # Static credentials
 ADMIN_EMAIL = "mgmcet.ieee@gmail.com"
 ADMIN_PASSWORD = "earthling-plasma5-overstock-explain"
@@ -363,34 +421,115 @@ def generate_certificates_zip(generator, names, config):
     return zip_buffer
 
 def registration_page():
-    """Public registration page - no login required"""
-    st.markdown('<h1 class="main-header">⚡ IEEE Event Registration</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Register for our event | IEEE Student Branch MGMCET</p>', unsafe_allow_html=True)
+    """Enhanced Google Forms-style registration page"""
+    form_config = load_form_config()
     
-    st.info("📝 Fill out the form below to register for the event. You'll receive your certificate after the event!")
+    # Header with IEEE branding
+    st.markdown(f'<h1 class="main-header">{form_config["title"]}</h1>', unsafe_allow_html=True)
+    st.markdown(f'<p class="sub-header">{form_config["description"]}</p>', unsafe_allow_html=True)
     
-    with st.form("registration_form"):
-        col1, col2, col3 = st.columns([1, 2, 1])
+    # Google Forms-style CSS
+    st.markdown("""
+    <style>
+        .form-container {
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 2rem;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    with st.form("dynamic_registration_form", clear_on_submit=False):
+        form_data = {}
         
-        with col2:
-            name = st.text_input("📛 Full Name *", placeholder="Enter your full name")
-            email = st.text_input("📧 Email Address *", placeholder="Enter your email")
+        for field in form_config['fields']:
+            field_id = field['id']
+            label = field['label']
+            if field.get('required', False):
+                label += " *"
             
-            submit = st.form_submit_button("🚀 Register Now", use_container_width=True)
+            # Render field based on type
+            if field['type'] == 'text':
+                form_data[field_id] = st.text_input(
+                    label,
+                    placeholder=field.get('placeholder', ''),
+                    key=f"field_{field_id}",
+                    help=field.get('description', '')
+                )
+            elif field['type'] == 'email':
+                form_data[field_id] = st.text_input(
+                    label,
+                    placeholder=field.get('placeholder', ''),
+                    key=f"field_{field_id}",
+                    help=field.get('description', '')
+                )
+            elif field['type'] in ['tel', 'phone']:
+                form_data[field_id] = st.text_input(
+                    label,
+                    placeholder=field.get('placeholder', ''),
+                    key=f"field_{field_id}",
+                    help=field.get('description', '')
+                )
+            elif field['type'] == 'number':
+                form_data[field_id] = st.number_input(
+                    label,
+                    key=f"field_{field_id}",
+                    help=field.get('description', '')
+                )
+            elif field['type'] == 'date':
+                form_data[field_id] = st.date_input(
+                    label,
+                    key=f"field_{field_id}",
+                    help=field.get('description', '')
+                )
+            elif field['type'] == 'select':
+                form_data[field_id] = st.selectbox(
+                    label,
+                    options=field.get('options', []),
+                    key=f"field_{field_id}",
+                    help=field.get('description', '')
+                )
+            elif field['type'] == 'textarea':
+                form_data[field_id] = st.text_area(
+                    label,
+                    placeholder=field.get('placeholder', ''),
+                    key=f"field_{field_id}",
+                    help=field.get('description', '')
+                )
+        
+        # Submit button
+        submit = st.form_submit_button("🚀 Submit Registration", use_container_width=True, type="primary")
+        
+        if submit:
+            # Validate form data
+            errors = validate_form_data(form_data, form_config)
             
-            if submit:
-                if not name or not email:
-                    st.error("❌ Please fill in all fields!")
-                elif "@" not in email or "." not in email:
-                    st.error("❌ Please enter a valid email address!")
+            if errors:
+                for error in errors:
+                    st.error(f"❌ {error}")
+            else:
+                # Save registration with all fields
+                registration = {
+                    'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                }
+                registration.update(form_data)
+                
+                # Check for duplicate (using email if present)
+                registrations = load_registrations()
+                email_field = form_data.get('email', '')
+                if email_field and any(r.get('email', '').lower() == email_field.lower() for r in registrations):
+                    st.warning("⚠️ This email is already registered!")
                 else:
-                    success, message = save_registration(name.strip(), email.strip())
-                    if success:
-                        st.success(f"✅ {message}")
-                        st.balloons()
-                        st.info("🎓 You're registered! You'll receive your certificate after the event.")
-                    else:
-                        st.warning(f"⚠️ {message}")
+                    registrations.append(registration)
+                    with open(REGISTRATIONS_FILE, 'w') as f:
+                        json.dump(registrations, f, indent=2)
+                    
+                    st.success("✅ Registration successful!")
+                    st.balloons()
+                    st.info("🎓 You're registered! You'll receive your certificate after the event.")
     
     st.divider()
     st.markdown("""
@@ -498,6 +637,118 @@ def view_responses_page():
     else:
         st.info("📭 No registrations yet. Share the registration link to start collecting responses!")
 
+def form_builder_page():
+    """Admin page to build and customize registration forms"""
+    st.markdown('<h2 class="main-header">📝 Form Builder</h2>', unsafe_allow_html=True)
+    st.info("🛠️ Customize your registration form by adding, editing, or removing fields")
+    
+    # Load current form config
+    form_config = load_form_config()
+    
+    # Form title and description
+    st.subheader("📋 Form Details")
+    col1, col2 = st.columns(2)
+    with col1:
+        form_config['title'] = st.text_input("Form Title", value=form_config['title'])
+    with col2:
+        form_config['description'] = st.text_area("Form Description", value=form_config['description'], height=100)
+    
+    st.divider()
+    
+    # Display existing fields
+    st.subheader("📝 Form Fields")
+    
+    if 'fields' not in form_config:
+        form_config['fields'] = []
+    
+    # Display each field with edit/delete options
+    for idx, field in enumerate(form_config['fields']):
+        with st.expander(f"{'🔴' if field.get('required') else '⚪'} {field.get('label', 'Untitled Field')}", expanded=False):
+            col1, col2 = st.columns([3, 1])
+            
+            with col1:
+                field['label'] = st.text_input(f"Label", value=field.get('label', ''), key=f"label_{idx}")
+                field['id'] = st.text_input(f"Field ID (for data)", value=field.get('id', ''), key=f"id_{idx}")
+                field['type'] = st.selectbox(
+                    "Field Type",
+                    ['text', 'email', 'tel', 'number', 'date', 'select', 'textarea'],
+                    index=['text', 'email', 'tel', 'number', 'date', 'select', 'textarea'].index(field.get('type', 'text')),
+                    key=f"type_{idx}"
+                )
+                
+                field['placeholder'] = st.text_input(f"Placeholder", value=field.get('placeholder', ''), key=f"placeholder_{idx}")
+                field['description'] = st.text_input(f"Help Text", value=field.get('description', ''), key=f"desc_{idx}")
+                field['required'] = st.checkbox("Required Field", value=field.get('required', False), key=f"req_{idx}")
+                
+                # Options for select fields
+                if field['type'] == 'select':
+                    options_str = ', '.join(field.get('options', []))
+                    new_options = st.text_input("Options (comma-separated)", value=options_str, key=f"options_{idx}")
+                    field['options'] = [opt.strip() for opt in new_options.split(',') if opt.strip()]
+            
+            with col2:
+                st.write("")
+                st.write("")
+                if st.button("🗑️ Delete", key=f"del_{idx}", type="secondary"):
+                    form_config['fields'].pop(idx)
+                    save_form_config(form_config)
+                    st.rerun()
+    
+    st.divider()
+    
+    # Add new field
+    st.subheader("➕ Add New Field")
+    with st.form("add_field_form"):
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            new_label = st.text_input("Field Label", placeholder="e.g., Phone Number")
+            new_id = st.text_input("Field ID", placeholder="e.g., phone")
+        
+        with col2:
+            new_type = st.selectbox("Type", ['text', 'email', 'tel', 'number', 'date', 'select', 'textarea'])
+            new_required = st.checkbox("Required")
+        
+        with col3:
+            new_placeholder = st.text_input("Placeholder")
+            new_description = st.text_input("Help Text")
+        
+        # Options for select type
+        new_options = []
+        if new_type == 'select':
+            options_input = st.text_input("Options (comma-separated)", placeholder="Option1, Option2, Option3")
+            new_options = [opt.strip() for opt in options_input.split(',') if opt.strip()]
+        
+        if st.form_submit_button("➕ Add Field", use_container_width=True):
+            if new_label and new_id:
+                new_field = {
+                    'id': new_id,
+                    'type': new_type,
+                    'label': new_label,
+                    'required': new_required,
+                    'placeholder': new_placeholder,
+                    'description': new_description
+                }
+                if new_type == 'select':
+                    new_field['options'] = new_options
+                
+                form_config['fields'].append(new_field)
+                save_form_config(form_config)
+                st.success(f"✅ Field '{new_label}' added!")
+                st.rerun()
+            else:
+                st.error("❌ Label and ID are required!")
+    
+    st.divider()
+    
+    # Save button
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        if st.button("💾 Save Form Configuration", type="primary", use_container_width=True):
+            save_form_config(form_config)
+            st.success("✅ Form configuration saved!")
+            st.balloons()
+
 # Check if we're on the registration page (public access)
 try:
     page = st.query_params.get("page", "")
@@ -516,7 +767,7 @@ else:
     st.markdown('<p class="sub-header">Advancing Technology for Humanity | IEEE Student Branch MGMCET</p>', unsafe_allow_html=True)
 
     # Add tabs for navigation
-    tab1, tab2 = st.tabs(["🎓 Certificate Generator", "📊 View Responses"])
+    tab1, tab2, tab3 = st.tabs(["🎓 Certificate Generator", "📊 View Responses", "📝 Form Builder"])
     
     with tab1:
         # Original certificate generation code (sidebar + main content)
@@ -910,4 +1161,8 @@ IEEE Student Branch MGMCET"""
     with tab2:
         # View Responses tab
         view_responses_page()
+    
+    with tab3:
+        # Form Builder tab
+        form_builder_page()
 
