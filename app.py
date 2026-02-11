@@ -1433,9 +1433,13 @@ else:
             with col1:
                 st.write("**Email Configuration**")
                 
-                # Load default config
-                default_sender = "mgmcet.ieee@gmail.com"
-                default_password = "phj hnn ozr oxr ivub"
+                # Load config from secrets or defaults
+                if "email" in st.secrets:
+                    default_sender = st.secrets["email"].get("sender_email", "mgmcet.ieee@gmail.com")
+                    default_password = st.secrets["email"].get("sender_password", "")
+                else:
+                    default_sender = "mgmcet.ieee@gmail.com"
+                    default_password = "phj hnn ozr oxr ivub"
                 
                 sender_email = st.text_input(
                     "Sender Email",
