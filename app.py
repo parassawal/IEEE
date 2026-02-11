@@ -866,8 +866,8 @@ def view_responses_page():
     with col1:
         # Create form-specific registration link - using production URL
         try:
-            # For Streamlit Cloud deployment
-            base_url = "https://ieee-mgmcet.streamlit.app"
+            # Base URL - UPDATE THIS WITH YOUR DEPLOYED APP URL
+            base_url = "https://ieeemail.streamlit.app"
         except:
             base_url = "https://ieee-mgmcet.streamlit.app"
         
