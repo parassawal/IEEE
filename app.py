@@ -696,16 +696,9 @@ def view_responses_page():
     with col1:
         # Create form-specific registration link - auto-detect URL
         try:
-            # Try to get the actual hostname from Streamlit
-            import streamlit as st
-            # Use localhost for local development, or the actual URL for deployment
-            if 'localhost' in str(st.context.headers) or '127.0.0.1' in str(st.context.headers):
-                base_url = "http://localhost:8501"
-            else:
-                # For Streamlit Cloud, use the deployed URL
-                base_url = "https://your-app.streamlit.app"  # Replace with your actual Streamlit Cloud URL
+            # Use localhost for local development
+            base_url = "http://localhost:8501"
         except:
-            # Fallback to localhost for local testing
             base_url = "http://localhost:8501"
         
         registration_url = f"{base_url}?page=register&form={selected_form_id}"
