@@ -705,41 +705,121 @@ def registration_page():
     st.markdown(f'<h1 class="main-header">{form_config["title"]}</h1>', unsafe_allow_html=True)
     st.markdown(f'<p class="sub-header">{form_config["description"]}</p>', unsafe_allow_html=True)
     
-    # Google Forms-style CSS
+    # Premium UI CSS
     st.markdown("""
     <style>
+        /* Import Google Font */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        /* Global Styles */
+        html, body, [class*="css"] {
+            font-family: 'Inter', sans-serif;
+            color: #1a202c;
+        }
+        
+        /* Main Header */
         .main-header {
             text-align: center;
             color: #00629B;
-            font-family: 'Helvetica Neue', sans-serif;
+            font-weight: 800;
+            font-size: 2.5rem;
             margin-bottom: 0.5rem;
+            letter-spacing: -0.02em;
+            text-shadow: 0 2px 10px rgba(0, 98, 155, 0.1);
         }
+        
+        /* Sub Header */
         .sub-header {
             text-align: center;
-            color: #666;
-            margin-bottom: 2rem;
+            color: #4a5568;
+            margin-bottom: 3rem;
             font-size: 1.1rem;
+            line-height: 1.6;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
         }
-        .form-container {
+
+        /* Form Container Card */
+        div[data-testid="stForm"] {
+            background-color: #ffffff;
+            border: none;
+            padding: 3rem;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.1), 0 10px 20px -10px rgba(0, 0, 0, 0.05);
+            border-top: 8px solid #00629B;
             max-width: 700px;
             margin: 0 auto;
-            padding: 2.5rem;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            border-top: 8px solid #00629B;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
+
+        /* Input Labels */
         .stTextInput label, .stNumberInput label, .stSelectbox label, .stTextArea label, .stDateInput label {
             font-weight: 600;
-            color: #333;
+            color: #2d3748;
+            font-size: 0.95rem;
+            margin-bottom: 0.4rem;
+            letter-spacing: 0.01em;
         }
-        div[data-testid="stForm"] {
-            border: 1px solid #e0e0e0;
-            padding: 2rem;
+        
+        /* Input Fields */
+        .stTextInput input, .stNumberInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"] {
             border-radius: 8px;
-            background-color: #ffffff;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-            border-top: 10px solid #00629B;
+            border: 1px solid #e2e8f0;
+            padding: 0.6rem 1rem;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
+        .stTextInput input:focus, .stNumberInput input:focus, .stTextArea textarea:focus, .stSelectbox div[data-baseweb="select"]:focus-within {
+            border-color: #00629B;
+            box-shadow: 0 0 0 3px rgba(0, 98, 155, 0.15);
+            transform: translateY(-1px);
+        }
+
+        /* Submit Button */
+        div[data-testid="stForm"] button[kind="primaryFormSubmit"] {
+            width: 100%;
+            background: linear-gradient(135deg, #00629B 0%, #004d7a 100%);
+            color: white;
+            font-weight: 600;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            border: none;
+            transition: all 0.3s ease;
+            margin-top: 1rem;
+            box-shadow: 0 4px 6px rgba(0, 98, 155, 0.2);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-size: 1rem;
+        }
+
+        div[data-testid="stForm"] button[kind="primaryFormSubmit"]:hover {
+            box-shadow: 0 7px 14px rgba(0, 98, 155, 0.3);
+            transform: translateY(-2px);
+            background: linear-gradient(135deg, #0077ba 0%, #005688 100%);
+        }
+
+        div[data-testid="stForm"] button[kind="primaryFormSubmit"]:active {
+            transform: translateY(1px);
+            box-shadow: 0 2px 4px rgba(0, 98, 155, 0.2);
+        }
+
+        /* Helper Text */
+        .stMarkdown div p {
+            font-size: 0.9rem;
+            color: #718096;
+        }
+
+        /* Responsive Adjustments */
+        @media (max-width: 640px) {
+            div[data-testid="stForm"] {
+                padding: 1.5rem;
+                border-radius: 12px;
+            }
+            .main-header {
+                font-size: 1.8rem;
+            }
         }
     </style>
     """, unsafe_allow_html=True)
